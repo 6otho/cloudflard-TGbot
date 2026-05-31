@@ -1,6 +1,6 @@
 /**
  * Telegram 双向机器人 Cloudflare Worker (网页大盘 + TG内建控制台版)
- * 1. 根目录直接访问 Web 管理面板
+ * 1. 根目录直接访问 Web 管理面板 (高级 SaaS UI - 支持中英双语 & 暗黑模式)
  * 2. TG 内部自动生成「📋 用户资料卡汇总」话题，统一集中管理
  * 3. 【极致人性化排版】有用户名时直达主页，无用户名时再显示后备主页链接
  * 4. 【昵称醒目化】采用原生加粗，安全免疫花字 Bug
@@ -76,16 +76,13 @@ function getUserInfo(user, initialTimestamp = null) {
     let idDisplay = "";
 
     if (user.username) {
-        // 有用户名直达，界面极其清爽
         usernameDisplay = `<a href="https://t.me/${user.username}">@${escapeHtml(user.username)}</a>`;
         idDisplay = `<code>${userId}</code>`;
     } else {
-        // 无用户名，自动追加备用跳转（防呆防丢）
         usernameDisplay = "无";
         idDisplay = `<code>${userId}</code> <a href="tg://user?id=${userId}">[🔗 查主页]</a>`;
     }
     
-    // ⭐ 将昵称用 <b> 标签原生加粗，安全免疫一切花字 Bug ⭐
     const infoCard = `<b>👤 用户资料卡</b>\n---\n• 昵称: <b>${escapeHtml(rawName)}</b>\n• 用户名: ${usernameDisplay}\n• ID: ${idDisplay}\n• 连接时间: <code>${timestamp}</code>`;
 
     return { 
@@ -97,7 +94,6 @@ function getUserInfo(user, initialTimestamp = null) {
     };
 }
 
-// ⭐ 获取汇总话题 ID (自动创建) ⭐
 async function getSummaryTopicId(env) {
     let topicId = await dbConfigGet('summary_topic_id', env);
     if (!topicId) {
@@ -163,57 +159,360 @@ async function telegramApi(token, methodName, params = {}) {
     return data.result;
 }
 
-// ==================== Web 网页代码 ====================
+// ==================== 全新高级 UI 网页代码 (支持多语言 + 暗色模式) ====================
 const ADMIN_HTML = `
-<!DOCTYPE html><html lang="zh-CN"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>传话筒管理中心</title><script src="https://cdn.tailwindcss.com"></script>
-<style>body{background:linear-gradient(135deg,#f5f7fa 0%,#c3cfe2 100%);min-height:100vh}.glass{background:rgba(255,255,255,0.85);backdrop-filter:blur(12px);border:1px solid rgba(255,255,255,0.4);box-shadow:0 8px 32px rgba(31,38,135,0.1)}.fade-in{animation:fadeIn 0.4s ease-in-out}@keyframes fadeIn{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}::-webkit-scrollbar{width:6px;height:6px}::-webkit-scrollbar-thumb{background:#cbd5e1;border-radius:4px}</style></head>
-<body class="flex items-center justify-center p-4 md:p-10">
-    <div id="login-box" class="glass rounded-2xl p-8 max-w-sm w-full fade-in">
-        <div class="text-center mb-6"><h2 class="text-2xl font-bold text-gray-800">传话筒管理中心</h2><p class="text-sm text-gray-500 mt-2">请输入主管 TG ID</p></div>
-        <input type="password" id="admin-pwd" placeholder="主管 TG ID" class="w-full px-4 py-3 rounded-xl border border-gray-300 focus:ring-2 focus:ring-blue-400 focus:outline-none mb-4">
-        <button onclick="login()" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 rounded-xl shadow-lg">进入系统</button>
+<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>TGbot | Control Center</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script>tailwind.config = { darkMode: 'class' }</script>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700;900&display=swap');
+body{font-family:'Inter',sans-serif;}
+.fade-in{animation:fadeIn 0.5s ease-out;} @keyframes fadeIn{from{opacity:0;transform:translateY(15px);}to{opacity:1;transform:translateY(0);}}
+.hide-scrollbar::-webkit-scrollbar{display:none;} .hide-scrollbar{-ms-overflow-style:none;scrollbar-width:none;}
+.glass-effect{backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);}
+</style></head>
+<body class="flex items-center justify-center h-screen overflow-hidden text-gray-800 bg-[#d4d4d8] dark:bg-zinc-950 transition-colors duration-300">
+    
+    <!-- Login Screen -->
+    <div id="login-box" class="w-full max-w-sm px-4 fade-in z-10">
+        <div class="bg-white dark:bg-zinc-900 rounded-[2.5rem] p-10 shadow-[0_20px_50px_rgba(0,0,0,0.1)] dark:shadow-none border border-gray-100 dark:border-zinc-800 text-center relative overflow-hidden transition-colors duration-300">
+            <div class="w-16 h-16 bg-gradient-to-br from-[#ff6b4a] to-[#ff4a2b] rounded-full flex items-center justify-center mx-auto mb-6 shadow-lg shadow-orange-500/30 text-white">
+                <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"></path></svg>
+            </div>
+            <h2 class="text-3xl font-black text-gray-900 dark:text-white mb-2 tracking-tight" data-i18n="loginTitle">TGBOT</h2>
+            <p class="text-gray-400 text-sm mb-8 font-medium" data-i18n="loginSub">Please enter your supervisor ID</p>
+            <input type="password" id="admin-pwd" class="w-full px-5 py-4 bg-gray-50 dark:bg-zinc-950 rounded-2xl border border-transparent focus:border-orange-200 focus:ring-4 focus:ring-orange-100 dark:focus:ring-orange-900/30 outline-none mb-6 text-gray-700 dark:text-gray-200 placeholder-gray-400 font-medium transition-all text-center tracking-widest" data-i18n="pwdPlaceholder" placeholder="ID Number">
+            <button onclick="login()" id="login-btn" class="w-full bg-gradient-to-r from-[#ff6b4a] to-[#ff4a2b] hover:from-[#e55938] hover:to-[#e53a1a] text-white font-bold py-4 rounded-2xl shadow-[0_10px_20px_rgba(255,107,74,0.3)] transition-transform hover:-translate-y-1 active:translate-y-0" data-i18n="loginBtn">Access Now</button>
+        </div>
     </div>
-    <div id="dashboard-box" class="glass rounded-3xl p-6 md:p-8 max-w-6xl w-full hidden fade-in flex flex-col h-full max-h-[90vh]">
-        <div class="flex justify-between items-center mb-6 border-b border-gray-200 pb-4 shrink-0"><h1 class="text-2xl md:text-3xl font-bold text-gray-800">🤖 数据中心</h1><button onclick="logout()" class="text-sm text-red-500 font-semibold px-4 py-2 bg-red-50 rounded-lg">退出</button></div>
-        <div class="overflow-y-auto flex-1 pr-2">
-            <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-                <div class="bg-white p-5 rounded-2xl shadow-sm border border-gray-100 flex flex-col items-center"><span class="text-gray-500 text-sm">👥 总连接用户</span><span id="stat-total" class="text-3xl font-black text-gray-800 mt-2">-</span></div>
-                <div class="bg-white p-5 rounded-2xl shadow-sm border border-gray-100 flex flex-col items-center"><span class="text-green-600 text-sm">✅ 已验证放行</span><span id="stat-verified" class="text-3xl font-black text-green-500 mt-2">-</span></div>
-                <div class="bg-white p-5 rounded-2xl shadow-sm border border-gray-100 flex flex-col items-center"><span class="text-red-500 text-sm">🚫 拦截黑名单</span><span id="stat-blocked" class="text-3xl font-black text-red-500 mt-2">-</span></div>
-                <div class="bg-white p-5 rounded-2xl shadow-sm border border-gray-100 flex flex-col items-center"><span class="text-blue-500 text-sm">📝 消息修改记录</span><span id="stat-msgs" class="text-3xl font-black text-blue-500 mt-2">-</span></div>
+
+    <!-- Main Dashboard -->
+    <div id="dashboard-box" class="hidden w-full h-full p-2 md:p-6 fade-in flex gap-6 box-border max-w-[1600px] mx-auto">
+        <!-- Sidebar -->
+        <div class="w-[280px] bg-[#27272a] rounded-[2.5rem] flex-col p-6 shadow-2xl relative overflow-hidden hidden lg:flex shrink-0">
+            <div class="text-white font-black text-3xl mb-12 flex items-center gap-3 mt-4 px-2 tracking-tighter">
+                <div class="w-10 h-10 bg-gradient-to-br from-[#ff6b4a] to-[#ff4a2b] rounded-full flex items-center justify-center shadow-lg shadow-orange-500/40 shrink-0">
+                    <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"></path></svg>
+                </div>
+                <div>TG<span class="text-[#ff6b4a]">bot.</span></div>
             </div>
-            <div class="bg-blue-50 border border-blue-100 rounded-2xl p-5 mb-8 flex flex-col md:flex-row items-center justify-between">
-                <div><h3 class="text-lg font-bold text-blue-800 mb-1">系统状态控制</h3><p class="text-sm text-blue-600">刚部署或无反应点右边激活。</p></div>
-                <button onclick="setWebhook()" id="webhook-btn" class="mt-4 md:mt-0 bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-8 rounded-xl shadow">⚡ 一键激活机器人</button>
+            
+            <nav class="flex flex-col gap-3 flex-1">
+                <div onclick="switchTab('dashboard')" class="flex items-center gap-4 text-white bg-white/10 px-5 py-4 rounded-2xl cursor-pointer backdrop-blur-sm border border-white/5 transition-colors group" id="nav-dash-bg">
+                    <div id="nav-dash-dot" class="w-2 h-2 rounded-full bg-[#ff6b4a] shadow-[0_0_8px_rgba(255,107,74,0.8)] transition-colors"></div>
+                    <span id="nav-dash-text" class="font-bold text-sm tracking-wide text-white group-hover:text-white transition-colors" data-i18n="navDash">Dashboard</span>
+                </div>
+                <div onclick="switchTab('settings')" class="flex items-center gap-4 text-white bg-transparent px-5 py-4 rounded-2xl cursor-pointer backdrop-blur-sm border border-transparent hover:bg-white/5 transition-colors group" id="nav-set-bg">
+                    <div id="nav-set-dot" class="w-2 h-2 rounded-full bg-gray-600 group-hover:bg-gray-400 transition-colors"></div>
+                    <span id="nav-set-text" class="font-bold text-sm tracking-wide text-gray-400 group-hover:text-white transition-colors" data-i18n="navSet">Settings</span>
+                </div>
+            </nav>
+
+            <div class="bg-[#3f3f46] rounded-3xl p-6 mt-auto relative overflow-hidden group">
+                 <div class="absolute -right-4 -top-4 w-20 h-20 bg-white/5 rounded-full blur-xl group-hover:bg-[#ff6b4a]/20 transition-all"></div>
+                 <h4 class="text-white font-bold text-sm mb-1 tracking-wide relative z-10" data-i18n="sysId">System Identity</h4>
+                 <p class="text-xs text-gray-400 mb-5 relative z-10 font-medium" data-i18n="sysSub">Logged in securely.</p>
+                 <button onclick="logout()" class="relative z-10 text-xs font-bold bg-white text-black px-5 py-2.5 rounded-full hover:bg-gray-200 transition-transform hover:scale-105 shadow-md" data-i18n="logout">Sign Out</button>
             </div>
-            <div class="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-                <div class="p-5 border-b border-gray-100 bg-gray-50 flex justify-between items-center"><h3 class="text-lg font-bold text-gray-800">📋 用户明细汇总</h3><button onclick="fetchUsers()" class="text-sm text-blue-500 hover:text-blue-700 font-medium">🔄 刷新列表</button></div>
-                <div class="overflow-x-auto"><table class="w-full text-left border-collapse min-w-[750px]">
-                    <thead><tr class="bg-white text-gray-400 text-xs uppercase border-b border-gray-100"><th class="p-4">TG ID</th><th class="p-4">昵称 / 用户名</th><th class="p-4">身份状态</th><th class="p-4">静音状态</th><th class="p-4">违规</th><th class="p-4">操作</th></tr></thead>
-                    <tbody id="user-table-body" class="text-sm text-gray-700 divide-y divide-gray-50"><tr><td colspan="6" class="p-8 text-center text-gray-400">加载中...</td></tr></tbody>
-                </table></div>
+        </div>
+
+        <!-- Main Content Area -->
+        <div class="flex-1 bg-[#f4f4f5] dark:bg-zinc-900 md:rounded-[2.5rem] rounded-2xl shadow-xl flex flex-col p-6 md:p-12 overflow-hidden relative border border-white dark:border-zinc-800 transition-colors duration-300">
+            <div class="overflow-y-auto h-full pr-2 pb-10 hide-scrollbar">
+                
+                <!-- ================= DASHBOARD VIEW ================= -->
+                <div id="view-dashboard" class="block fade-in">
+                    <div class="flex flex-col md:flex-row justify-between items-start md:items-end mb-12 gap-6">
+                        <div>
+                            <h1 class="text-4xl md:text-6xl font-black text-gray-900 dark:text-white tracking-tighter leading-none mb-3" data-i18n="mainTitle">Let's start<br>managing!</h1>
+                            <p class="text-gray-500 dark:text-gray-400 font-medium text-sm tracking-wide" data-i18n="mainSub">TG Bot Data & User Control Center</p>
+                        </div>
+                        <div class="glass-effect bg-white/50 dark:bg-zinc-800/50 rounded-[2rem] p-4 flex items-center gap-6 border border-white dark:border-zinc-700 shadow-sm self-start md:self-end transition-colors">
+                             <div class="pl-2">
+                                 <p class="text-[10px] text-gray-400 font-bold uppercase tracking-widest mb-1" data-i18n="statusAction">Status Action</p>
+                                 <p class="text-sm font-black text-gray-800 dark:text-gray-200" data-i18n="activateBot">Activate Bot?</p>
+                             </div>
+                             <button onclick="setWebhook()" id="webhook-btn" class="w-14 h-14 bg-gradient-to-b from-[#ff6b4a] to-[#e53a1a] text-white rounded-full flex items-center justify-center shadow-[0_10px_20px_rgba(255,107,74,0.3)] transition-all hover:scale-110 active:scale-95 border-2 border-white/20">
+                                 <svg class="w-6 h-6" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M11.3 1.046A1 1 0 0112 2v5h4a1 1 0 01.82 1.573l-7 10A1 1 0 018 18v-5H4a1 1 0 01-.82-1.573l7-10a1 1 0 011.12-.38z" clip-rule="evenodd"></path></svg>
+                             </button>
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6 mb-12">
+                        <div class="bg-white dark:bg-zinc-800 rounded-[2rem] p-6 shadow-sm border border-gray-100 dark:border-zinc-700 flex flex-col items-center justify-center text-center transition-colors">
+                            <div class="w-14 h-14 bg-gray-50 dark:bg-zinc-900 rounded-full flex items-center justify-center text-gray-700 dark:text-gray-300 mb-4 shadow-inner border border-gray-100 dark:border-zinc-800">
+                                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"></path></svg>
+                            </div>
+                            <span class="text-[10px] text-gray-400 font-bold uppercase tracking-widest mb-1" data-i18n="totalUsers">Total Users</span>
+                            <span id="stat-total" class="text-3xl font-black text-gray-800 dark:text-white tracking-tighter">0</span>
+                        </div>
+                        <div class="bg-white dark:bg-zinc-800 rounded-[2rem] p-6 shadow-sm border border-gray-100 dark:border-zinc-700 flex flex-col items-center justify-center text-center transition-colors">
+                            <div class="w-14 h-14 bg-gray-50 dark:bg-zinc-900 rounded-full flex items-center justify-center text-green-500 mb-4 shadow-inner border border-gray-100 dark:border-zinc-800">
+                                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                            </div>
+                            <span class="text-[10px] text-gray-400 font-bold uppercase tracking-widest mb-1" data-i18n="verified">Verified</span>
+                            <span id="stat-verified" class="text-3xl font-black text-gray-800 dark:text-white tracking-tighter">0</span>
+                        </div>
+                        <div class="bg-white dark:bg-zinc-800 rounded-[2rem] p-6 shadow-sm border border-gray-100 dark:border-zinc-700 flex flex-col items-center justify-center text-center transition-colors">
+                            <div class="w-14 h-14 bg-gray-50 dark:bg-zinc-900 rounded-full flex items-center justify-center text-red-500 mb-4 shadow-inner border border-gray-100 dark:border-zinc-800">
+                                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636"></path></svg>
+                            </div>
+                            <span class="text-[10px] text-gray-400 font-bold uppercase tracking-widest mb-1" data-i18n="blocked">Blocked</span>
+                            <span id="stat-blocked" class="text-3xl font-black text-gray-800 dark:text-white tracking-tighter">0</span>
+                        </div>
+                        <div class="bg-white dark:bg-zinc-800 rounded-[2rem] p-6 shadow-sm border border-gray-100 dark:border-zinc-700 flex flex-col items-center justify-center text-center relative overflow-hidden transition-colors">
+                            <div class="w-14 h-14 bg-gray-50 dark:bg-zinc-900 rounded-full flex items-center justify-center text-[#ff6b4a] mb-4 shadow-inner border border-gray-100 dark:border-zinc-800 relative z-10">
+                                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z"></path></svg>
+                            </div>
+                            <span class="text-[10px] text-gray-400 font-bold uppercase tracking-widest mb-1 relative z-10" data-i18n="messages">Messages</span>
+                            <span id="stat-msgs" class="text-3xl font-black text-gray-800 dark:text-white tracking-tighter relative z-10">0</span>
+                        </div>
+                    </div>
+
+                    <div class="bg-white dark:bg-zinc-800 rounded-[2.5rem] shadow-sm border border-gray-100 dark:border-zinc-700 p-2 md:p-4 transition-colors">
+                        <div class="flex justify-between items-center px-4 md:px-6 pt-4 pb-2">
+                            <h3 class="text-2xl font-black text-gray-900 dark:text-white tracking-tight" data-i18n="summary">Summary</h3>
+                            <button onclick="fetchUsers()" class="text-xs font-bold text-gray-500 dark:text-gray-400 hover:text-black dark:hover:text-white px-5 py-2 bg-gray-50 dark:bg-zinc-900 rounded-full transition-colors flex items-center gap-2 border border-gray-200 dark:border-zinc-700">
+                                <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg> <span data-i18n="refresh">Refresh</span>
+                            </button>
+                        </div>
+                        <div class="overflow-x-auto px-2">
+                            <table class="w-full text-left min-w-[800px] border-separate border-spacing-y-3">
+                                <thead>
+                                    <tr class="text-gray-400 dark:text-gray-500 text-[11px] font-bold uppercase tracking-widest">
+                                        <th class="px-6 py-2" data-i18n="colId">ID</th>
+                                        <th class="px-6 py-2" data-i18n="colProfile">Profile</th>
+                                        <th class="px-6 py-2" data-i18n="colStatus">Status</th>
+                                        <th class="px-6 py-2" data-i18n="colAlert">Alert</th>
+                                        <th class="px-6 py-2" data-i18n="colRules">Rules</th>
+                                        <th class="px-6 py-2 text-right" data-i18n="colAction">Action</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="user-table-body" class="text-sm">
+                                    <tr><td colspan="6" class="p-10 text-center text-gray-400 font-bold" data-i18n="loading">Loading records...</td></tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ================= SETTINGS VIEW ================= -->
+                <div id="view-settings" class="hidden fade-in">
+                    <div class="mb-12">
+                        <h1 class="text-4xl md:text-6xl font-black text-gray-900 dark:text-white tracking-tighter leading-none mb-3" data-i18n="settingsTitle">System Settings</h1>
+                        <p class="text-gray-500 dark:text-gray-400 font-medium text-sm tracking-wide" data-i18n="settingsSub">Customize your dashboard experience.</p>
+                    </div>
+
+                    <div class="max-w-2xl flex flex-col gap-4">
+                        <!-- Theme Toggle -->
+                        <div class="flex justify-between items-center bg-white dark:bg-zinc-800 p-6 rounded-3xl shadow-sm border border-gray-100 dark:border-zinc-700 transition-colors">
+                            <div>
+                                <h3 class="font-bold text-lg text-gray-900 dark:text-white" data-i18n="themeTitle">Appearance (Dark Mode)</h3>
+                                <p class="text-sm text-gray-500 dark:text-gray-400 font-medium mt-1" data-i18n="themeDesc">Switch between light and dark themes</p>
+                            </div>
+                            <button onclick="toggleTheme()" class="relative inline-flex h-8 w-14 items-center rounded-full transition-colors focus:outline-none" id="theme-toggle-bg">
+                                <span class="inline-block h-6 w-6 transform rounded-full bg-white transition-transform shadow-sm" id="theme-toggle-dot"></span>
+                            </button>
+                        </div>
+
+                        <!-- Language Toggle -->
+                        <div class="flex justify-between items-center bg-white dark:bg-zinc-800 p-6 rounded-3xl shadow-sm border border-gray-100 dark:border-zinc-700 transition-colors">
+                            <div>
+                                <h3 class="font-bold text-lg text-gray-900 dark:text-white" data-i18n="langTitle">Language</h3>
+                                <p class="text-sm text-gray-500 dark:text-gray-400 font-medium mt-1" data-i18n="langDesc">Switch interface language</p>
+                            </div>
+                            <button onclick="toggleLang()" class="px-5 py-2.5 bg-gray-100 dark:bg-zinc-900 hover:bg-gray-200 dark:hover:bg-zinc-700 rounded-xl font-bold text-gray-800 dark:text-white transition-colors" id="lang-btn-text">
+                                EN / 中文
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
             </div>
         </div>
     </div>
+
+    <!-- Script: i18n & Logic -->
     <script>
-        const API_BASE='/api'; window.onload=()=>{if(localStorage.getItem('admin_id'))showDashboard();};
-        async function login(){const p=document.getElementById('admin-pwd').value;if(!p)return alert('请输入密码');const r=await fetch(API_BASE+'/auth',{method:'POST',body:JSON.stringify({password:p})});if(r.ok){localStorage.setItem('admin_id',p);showDashboard()}else alert('密码错误！');}
+        const API_BASE='/api'; 
+        
+        // --- i18n Dictionaries ---
+        const i18n = {
+            en: {
+                loginTitle: "TGBOT", loginSub: "Please enter your supervisor ID", pwdPlaceholder: "ID Number", loginBtn: "Access Now", loginWait: "Verifying...",
+                navDash: "Dashboard", navSet: "Settings", sysId: "System Identity", sysSub: "Logged in securely.", logout: "Sign Out",
+                mainTitle: "Let's start<br>managing!", mainSub: "TG Bot Data & User Control Center",
+                statusAction: "Status Action", activateBot: "Activate Bot?", totalUsers: "Total Users", verified: "Verified", blocked: "Blocked", messages: "Messages",
+                summary: "Summary", refresh: "Refresh", colId: "ID", colProfile: "Profile", colStatus: "Status", colAlert: "Alert", colRules: "Rules", colAction: "Action",
+                loading: "Loading records...", noData: "No records found.",
+                settingsTitle: "System Settings", settingsSub: "Customize your dashboard experience.",
+                themeTitle: "Appearance (Dark Mode)", themeDesc: "Switch between light and dark themes",
+                langTitle: "Language", langDesc: "Switch interface language",
+                
+                // Dynamic JS Strings
+                s_blocked: "Blocked", s_active: "Active", s_pending: "Pending",
+                a_muted: "🔕 Muted", a_active: "🔔 Active",
+                u_none: "No Username", u_unk: "Unknown",
+                btnReset: "Reset",
+                promptDel: "Delete this user completely?\\nThey will need to verify again next time."
+            },
+            zh: {
+                loginTitle: "TGBOT管理中心", loginSub: "请输入主管 TG ID", pwdPlaceholder: "主管密码/ID", loginBtn: "进入系统", loginWait: "验证中...",
+                navDash: "数据大盘", navSet: "系统设置", sysId: "管理员身份", sysSub: "已安全登录", logout: "退出系统",
+                mainTitle: "掌控全局<br>轻松管理！", mainSub: "TG 机器人数据与用户控制中心",
+                statusAction: "系统状态", activateBot: "激活机器人?", totalUsers: "总用户数", verified: "已验证放行", blocked: "拦截黑名单", messages: "消息记录",
+                summary: "数据明细", refresh: "刷新数据", colId: "账号 ID", colProfile: "用户资料", colStatus: "身份状态", colAlert: "提醒状态", colRules: "违规次数", colAction: "操作",
+                loading: "正在加载数据...", noData: "暂无任何数据记录。",
+                settingsTitle: "系统设置", settingsSub: "个性化定制你的大盘体验。",
+                themeTitle: "外观与主题 (Dark Mode)", themeDesc: "在亮色与暗色模式之间无缝切换",
+                langTitle: "显示语言 (Language)", langDesc: "切换界面的显示语言",
+                
+                // Dynamic JS Strings
+                s_blocked: "已拉黑", s_active: "正常", s_pending: "待验证",
+                a_muted: "🔕 已静音", a_active: "🔔 提醒开",
+                u_none: "无用户名", u_unk: "未知",
+                btnReset: "重置",
+                promptDel: "确定要彻底删除该用户并重置其状态吗？\\n用户下次发送消息将重新触发人机验证。"
+            }
+        };
+
+        let currentLang = localStorage.getItem('lang') || 'en';
+        let currentTheme = localStorage.getItem('theme') || 'light';
+
+        window.onload=()=>{
+            applyTheme();
+            applyLang();
+            if(localStorage.getItem('admin_id')) showDashboard();
+        };
+
+        // --- Theme Toggle ---
+        function toggleTheme() {
+            currentTheme = currentTheme === 'light' ? 'dark' : 'light';
+            localStorage.setItem('theme', currentTheme);
+            applyTheme();
+        }
+        function applyTheme() {
+            const html = document.documentElement;
+            const bg = document.getElementById('theme-toggle-bg');
+            const dot = document.getElementById('theme-toggle-dot');
+            if(currentTheme === 'dark') {
+                html.classList.add('dark');
+                if(bg) bg.classList.replace('bg-gray-200', 'bg-[#ff6b4a]');
+                if(bg) bg.classList.replace('dark:bg-zinc-600', 'bg-[#ff6b4a]'); // fallback safety
+                if(dot) dot.classList.replace('translate-x-1', 'translate-x-7');
+            } else {
+                html.classList.remove('dark');
+                if(bg) bg.className = "relative inline-flex h-8 w-14 items-center rounded-full transition-colors focus:outline-none bg-gray-200 dark:bg-zinc-600";
+                if(dot) dot.className = "inline-block h-6 w-6 transform rounded-full bg-white transition-transform shadow-sm translate-x-1";
+            }
+        }
+
+        // --- Language Toggle ---
+        function toggleLang() {
+            currentLang = currentLang === 'en' ? 'zh' : 'en';
+            localStorage.setItem('lang', currentLang);
+            applyLang();
+            if(!document.getElementById('dashboard-box').classList.contains('hidden')){
+                fetchUsers(); // re-render table with new lang
+            }
+        }
+        function applyLang() {
+            const dict = i18n[currentLang];
+            document.querySelectorAll('[data-i18n]').forEach(el => {
+                const key = el.getAttribute('data-i18n');
+                if(dict[key]) {
+                    if(el.tagName === 'INPUT') el.placeholder = dict[key];
+                    else el.innerHTML = dict[key];
+                }
+            });
+            const langBtn = document.getElementById('lang-btn-text');
+            if(langBtn) langBtn.innerText = currentLang === 'en' ? "🇺🇸 English" : "🇨🇳 简体中文";
+        }
+
+        // --- Navigation Tabs ---
+        function switchTab(tab) {
+            const vDash = document.getElementById('view-dashboard');
+            const vSet = document.getElementById('view-settings');
+            const nDashBg = document.getElementById('nav-dash-bg');
+            const nDashDot = document.getElementById('nav-dash-dot');
+            const nDashTxt = document.getElementById('nav-dash-text');
+            const nSetBg = document.getElementById('nav-set-bg');
+            const nSetDot = document.getElementById('nav-set-dot');
+            const nSetTxt = document.getElementById('nav-set-text');
+
+            if(tab === 'dashboard') {
+                vDash.classList.replace('hidden', 'block'); vSet.classList.replace('block', 'hidden');
+                nDashBg.classList.replace('bg-transparent', 'bg-white/10'); nDashBg.classList.remove('hover:bg-white/5');
+                nDashDot.classList.replace('bg-gray-600', 'bg-[#ff6b4a]'); nDashDot.classList.replace('group-hover:bg-gray-400', 'shadow-[0_0_8px_rgba(255,107,74,0.8)]');
+                nDashTxt.classList.replace('text-gray-400', 'text-white');
+                
+                nSetBg.classList.replace('bg-white/10', 'bg-transparent'); nSetBg.classList.add('hover:bg-white/5');
+                nSetDot.classList.replace('bg-[#ff6b4a]', 'bg-gray-600'); nSetDot.classList.replace('shadow-[0_0_8px_rgba(255,107,74,0.8)]', 'group-hover:bg-gray-400');
+                nSetTxt.classList.replace('text-white', 'text-gray-400');
+            } else {
+                vSet.classList.replace('hidden', 'block'); vDash.classList.replace('block', 'hidden');
+                nSetBg.classList.replace('bg-transparent', 'bg-white/10'); nSetBg.classList.remove('hover:bg-white/5');
+                nSetDot.classList.replace('bg-gray-600', 'bg-[#ff6b4a]'); nSetDot.classList.replace('group-hover:bg-gray-400', 'shadow-[0_0_8px_rgba(255,107,74,0.8)]');
+                nSetTxt.classList.replace('text-gray-400', 'text-white');
+                
+                nDashBg.classList.replace('bg-white/10', 'bg-transparent'); nDashBg.classList.add('hover:bg-white/5');
+                nDashDot.classList.replace('bg-[#ff6b4a]', 'bg-gray-600'); nDashDot.classList.replace('shadow-[0_0_8px_rgba(255,107,74,0.8)]', 'group-hover:bg-gray-400');
+                nDashTxt.classList.replace('text-white', 'text-gray-400');
+            }
+        }
+
+        // --- Core Logic ---
+        async function login(){
+            const btn=document.getElementById('login-btn'); const originalText=btn.innerText; btn.innerText=i18n[currentLang].loginWait;
+            const p=document.getElementById('admin-pwd').value;if(!p){btn.innerText=originalText; return;}
+            const r=await fetch(API_BASE+'/auth',{method:'POST',body:JSON.stringify({password:p})});
+            if(r.ok){localStorage.setItem('admin_id',p);showDashboard()}else{alert('Authentication failed!');btn.innerText=originalText;}
+        }
         function logout(){localStorage.removeItem('admin_id');document.getElementById('dashboard-box').classList.add('hidden');document.getElementById('login-box').classList.remove('hidden');document.getElementById('admin-pwd').value='';}
-        async function showDashboard(){document.getElementById('login-box').classList.add('hidden');document.getElementById('dashboard-box').classList.remove('hidden');await fetchStats();await fetchUsers();}
+        async function showDashboard(){document.getElementById('login-box').classList.add('hidden');document.getElementById('dashboard-box').classList.replace('hidden','flex');await fetchStats();await fetchUsers();}
+        
         async function fetchStats(){const a=localStorage.getItem('admin_id');const r=await fetch(API_BASE+'/stats?admin='+a);if(!r.ok)return logout();const d=await r.json();['total','verified','blocked','msgs'].forEach((k,i)=>document.getElementById('stat-'+k).innerText=[d.total,d.verified,d.blocked,d.messages][i]||0);}
-        async function fetchUsers(){const a=localStorage.getItem('admin_id');const r=await fetch(API_BASE+'/users?admin='+a);if(!r.ok)return;const u=await r.json();
+        
+        async function fetchUsers(){
+            const dict = i18n[currentLang];
+            const a=localStorage.getItem('admin_id');const r=await fetch(API_BASE+'/users?admin='+a);if(!r.ok)return;const u=await r.json();
             document.getElementById('user-table-body').innerHTML=u.map(x=>{
                 let i={};try{i=JSON.parse(x.user_info_json||"{}")}catch(e){}
-                return \`<tr class="hover:bg-blue-50 transition"><td class="p-4 font-mono text-blue-600"><a href="tg://user?id=\${x.user_id}">⍈ \${x.user_id}</a></td><td class="p-4">\${i.name||'未知'}<br><span class="text-xs text-gray-500">\${i.username||'无'}</span></td><td class="p-4">\${x.is_blocked?'<span class="px-2 py-1 bg-red-100 text-red-600 rounded text-xs font-bold">🚫 拉黑</span>':x.user_state==='verified'?'<span class="px-2 py-1 bg-green-100 text-green-600 rounded text-xs font-bold">✅ 正常</span>':'<span class="px-2 py-1 bg-yellow-100 text-yellow-600 rounded text-xs font-bold">⏳ 待验证</span>'}</td><td class="p-4">\${i.is_muted?'🔕 已静音':'🔔 提醒开'}</td><td class="p-4">\${x.block_count||0}次</td><td class="p-4"><button onclick="deleteUser('\${x.user_id}')" class="text-xs px-3 py-1.5 bg-red-100 text-red-600 rounded hover:bg-red-200 font-bold transition">重置</button></td></tr>\`;
-            }).join('')||'<tr><td colspan="6" class="p-8 text-center">暂无数据</td></tr>';
+                const statusColor = x.is_blocked ? 'bg-[#ff4a2b]' : x.user_state === 'verified' ? 'bg-[#10b981]' : 'bg-[#f59e0b]';
+                const statusText = x.is_blocked ? dict.s_blocked : x.user_state === 'verified' ? dict.s_active : dict.s_pending;
+                return \`
+                <tr class="group hover:bg-gray-50 dark:hover:bg-zinc-700/50 transition-colors">
+                    <td class="px-6 py-4 rounded-l-3xl"><a href="tg://user?id=\${x.user_id}" class="font-mono text-xs font-bold text-gray-500 dark:text-gray-400 hover:text-[#ff6b4a] dark:hover:text-[#ff6b4a] transition-colors">\${x.user_id}</a></td>
+                    <td class="px-6 py-4">
+                        <div class="font-black text-gray-900 dark:text-gray-100">\${i.name||dict.u_unk}</div>
+                        <div class="text-[11px] text-gray-400 dark:text-gray-500 font-bold mt-0.5 tracking-wide">\${i.username||dict.u_none}</div>
+                    </td>
+                    <td class="px-6 py-4">
+                        <div class="inline-flex items-center gap-2 px-4 py-1.5 bg-white dark:bg-zinc-800 border border-gray-100 dark:border-zinc-700 shadow-sm rounded-full text-xs font-bold text-gray-700 dark:text-gray-200">
+                            <span class="w-2 h-2 rounded-full \${statusColor} shadow-inner"></span>\${statusText}
+                        </div>
+                    </td>
+                    <td class="px-6 py-4 font-bold text-xs \${i.is_muted?'text-gray-400':'text-gray-800 dark:text-gray-200'}">\${i.is_muted?dict.a_muted:dict.a_active}</td>
+                    <td class="px-6 py-4 font-black text-gray-400 dark:text-gray-500">\${x.block_count||0}</td>
+                    <td class="px-6 py-4 text-right rounded-r-3xl">
+                        <button onclick="deleteUser('\${x.user_id}')" class="text-xs font-black px-5 py-2 bg-white dark:bg-zinc-800 text-gray-500 dark:text-gray-400 border border-gray-200 dark:border-zinc-700 shadow-sm rounded-full hover:bg-red-50 dark:hover:bg-red-500/10 hover:text-red-500 dark:hover:text-red-400 hover:border-red-100 dark:hover:border-red-500/20 transition-all active:scale-95">\${dict.btnReset}</button>
+                    </td>
+                </tr>\`;
+            }).join('')|| \`<tr><td colspan="6" class="p-10 text-center font-bold text-gray-400">\${dict.noData}</td></tr>\`;
         }
+        
         async function deleteUser(uid){
-            if(!confirm('确定要彻底删除该用户并重置其状态吗？\\n用户下次发送消息将重新触发人机验证。')) return;
-            const a=localStorage.getItem('admin_id');
-            await fetch(API_BASE+'/users/'+uid+'?admin='+a, {method:'DELETE'});
-            fetchUsers(); fetchStats();
+            if(!confirm(i18n[currentLang].promptDel)) return;
+            const a=localStorage.getItem('admin_id'); await fetch(API_BASE+'/users/'+uid+'?admin='+a, {method:'DELETE'}); fetchUsers(); fetchStats();
         }
-        async function setWebhook(){const b=document.getElementById('webhook-btn');b.innerText="处理中...";try{const r=await fetch(API_BASE+'/webhook',{method:'POST',body:JSON.stringify({admin:localStorage.getItem('admin_id')})});const d=await r.json();alert(d.success?"✅ 激活成功！":"❌ 失败");}catch(e){alert("出错");}b.innerText="⚡ 一键激活机器人";}
+        
+        async function setWebhook(){
+            const btn=document.getElementById('webhook-btn'); const originalHtml=btn.innerHTML; 
+            btn.innerHTML='<svg class="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>';
+            try{const r=await fetch(API_BASE+'/webhook',{method:'POST',body:JSON.stringify({admin:localStorage.getItem('admin_id')})});const d=await r.json();
+            if(d.success){btn.innerHTML='<svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>';}else{btn.innerHTML=originalHtml;alert("Failed");}}catch(e){btn.innerHTML=originalHtml;alert("Error");}
+            setTimeout(()=>btn.innerHTML=originalHtml, 2000);
+        }
     </script>
 </body></html>
 `;
@@ -393,7 +692,6 @@ async function handleRelayToTopic(message, user, env) {
     if (message.text) await dbMessageDataPut(userId, message.message_id.toString(), { text: message.text, date: message.date }, env);
 }
 
-// ⭐ 回调查询处理 ⭐
 async function handleCallbackQuery(callbackQuery, env) {
     const { data, message, id } = callbackQuery;
     const [action, userId] = data.split(':');
