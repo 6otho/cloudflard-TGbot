@@ -1,10 +1,5 @@
-为你精心编写了一份 **保姆级 GitHub README 部署文档**。排版上严格区分了主次层级，使用了大量 Emoji 提升可读性，并且把所有容易踩坑的细节（比如加 `-100`、必须开论坛模式、D1绑定等）全部标红标粗，极其适合新手无脑照做。
 
-你可以直接新建一个 `README.md` 文件，把下面的内容复制进去：
-
-***
-
-# 🤖 Telegram 双向客服机器人 (Cloudflare Worker 完美版)
+# 🤖 Telegram 双向客服机器人 
 
 ![License](https://img.shields.io/badge/license-MIT-blue.svg)
 ![Platform](https://img.shields.io/badge/platform-Cloudflare%20Workers-orange.svg)
